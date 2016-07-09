@@ -5,6 +5,7 @@
  */
 package com.stableapps.anglewraparounddemo;
 
+import com.stableapps.jfreechart.XYLineAndShapeRenderer;
 import java.awt.Color;
 
 import org.jfree.chart.ChartFactory;
@@ -15,7 +16,6 @@ import org.jfree.chart.axis.ValueAxis;
 import org.jfree.chart.plot.XYPlot;
 import org.jfree.chart.renderer.xy.XYAreaRenderer;
 import org.jfree.chart.renderer.xy.XYItemRenderer;
-import org.jfree.chart.renderer.xy.XYLineAndShapeRenderer;
 import org.jfree.data.time.Minute;
 import org.jfree.data.time.RegularTimePeriod;
 import org.jfree.data.time.TimeSeries;
@@ -39,7 +39,7 @@ public class AngleWrapDemoMain extends ApplicationFrame {
 		super(title);
 		final JFreeChart chart = createChart();
 		final ChartPanel chartPanel = new ChartPanel(chart);
-		chartPanel.setPreferredSize(new java.awt.Dimension(500, 270));
+		chartPanel.setPreferredSize(new java.awt.Dimension(1024, 768));
 		setContentPane(chartPanel);
 	}
 
@@ -50,9 +50,9 @@ public class AngleWrapDemoMain extends ApplicationFrame {
 	 *
 	 * @return the dataset.
 	 */
-	private XYDataset createDirectionDataset(final int count) {
+	private XYDataset createAngleDataset(final int count) {
 		final TimeSeriesCollection dataset = new TimeSeriesCollection();
-		final TimeSeries s1 = new TimeSeries("Wind Direction");
+		final TimeSeries s1 = new TimeSeries("Angle (In Degrees)");
 		RegularTimePeriod start = new Minute();
 		double direction = 180.0;
 		for (int i = 0; i < count; i++) {
@@ -96,7 +96,7 @@ public class AngleWrapDemoMain extends ApplicationFrame {
 	 * @return a sample chart.
 	 */
 	private JFreeChart createChart() {
-		final XYDataset direction = createDirectionDataset(600);
+		final XYDataset direction = createAngleDataset(600);
 		final JFreeChart chart = ChartFactory.createTimeSeriesChart(
 			"Time",
 			"Date",
@@ -155,7 +155,7 @@ public class AngleWrapDemoMain extends ApplicationFrame {
 	 * @param args ignored.
 	 */
 	public static void main(final String[] args) {
-		final AngleWrapDemoMain demo = new AngleWrapDemoMain("Compass Format Demo");
+		final AngleWrapDemoMain demo = new AngleWrapDemoMain("Angle Wrap Demo");
 		demo.pack();
 		RefineryUtilities.centerFrameOnScreen(demo);
 		demo.setVisible(true);
