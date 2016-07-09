@@ -114,17 +114,29 @@ public class AngleWrapDemoMain extends ApplicationFrame {
 		// configure the range axis to display directions...
 		final NumberAxis rangeAxis = (NumberAxis) plot.getRangeAxis();
 		rangeAxis.setAutoRangeIncludesZero(false);
+		plot.setRangeAxis(rangeAxis);
+
+		//There are two ways to provide custom logic for drawing lines between points:
+		//First is by assigning a DrawLinesCondition instance via XYLineAndShapeRenderer
+		XYLineAndShapeRenderer renderer = new XYLineAndShapeRenderer(new XYLineAndShapeRenderer.DrawLinesCondition() {
+			@Override
+			public boolean isDrawLine(double y0, double x0, double y1, double x1) {
+				return Math.abs(y1-y0) < 180;
+			}
+		}, false);
+		plot.setRenderer(0, renderer);
+
+		//Second is via getting an existing instance of XYLineAndShapeRenderer and calling its
+		//method setDrawLinesCondition(DrawLinesCondition)
+//		XYLineAndShapeRenderer renderer = (XYLineAndShapeRenderer) plot.getRenderer(0);
+//		renderer.setDrawLinesCondition(new XYLineAndShapeRenderer.DrawLinesCondition() {
+//			@Override
+//			public boolean isDrawLine(double y0, double x0, double y1, double x1) {
+//				return Math.abs(y1-y0) < 180;
+//			}
+//		});
 
 		// add the wind force with a secondary dataset/renderer/axis
-		plot.setRangeAxis(rangeAxis);
-		XYLineAndShapeRenderer renderer = (XYLineAndShapeRenderer) plot.getRenderer(0);
-		renderer.setDrawLinesCondition(new XYLineAndShapeRenderer.DrawLinesCondition() {
-			@Override
-			public boolean isDrawLine(double y1, double x1, double y2, double x2) {
-				return Math.abs(y2-y1) < 180;
-			}
-		});
-
 		final XYItemRenderer renderer2 = new XYAreaRenderer();
 		final ValueAxis axis2 = new NumberAxis("Force");
 		axis2.setRange(0.0, 12.0);
