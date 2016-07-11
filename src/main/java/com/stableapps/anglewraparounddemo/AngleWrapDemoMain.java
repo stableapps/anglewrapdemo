@@ -70,27 +70,6 @@ public class AngleWrapDemoMain extends ApplicationFrame {
 	}
 
 	/**
-	 * Creates a sample dataset.
-	 *
-	 * @param count the item count.
-	 *
-	 * @return the dataset.
-	 */
-	private XYDataset createForceDataset(final int count) {
-		final TimeSeriesCollection dataset = new TimeSeriesCollection();
-		final TimeSeries s1 = new TimeSeries("Wind Force");
-		RegularTimePeriod start = new Minute();
-		double force = 3.0;
-		for (int i = 0; i < count; i++) {
-			s1.add(start, force);
-			start = start.next();
-			force = Math.max(0.5, force + (Math.random() - 0.5) * 0.5);
-		}
-		dataset.addSeries(s1);
-		return dataset;
-	}
-
-	/**
 	 * Creates a sample chart.
 	 *
 	 * @return a sample chart.
@@ -135,16 +114,6 @@ public class AngleWrapDemoMain extends ApplicationFrame {
 //				return Math.abs(y1-y0) < 180;
 //			}
 //		});
-
-		// add the wind force with a secondary dataset/renderer/axis
-		final XYItemRenderer renderer2 = new XYAreaRenderer();
-		final ValueAxis axis2 = new NumberAxis("Force");
-		axis2.setRange(0.0, 12.0);
-		renderer2.setSeriesPaint(0, new Color(0, 0, 255, 128));
-		plot.setDataset(1, createForceDataset(600));
-		plot.setRenderer(1, renderer2);
-		plot.setRangeAxis(1, axis2);
-		plot.mapDatasetToRangeAxis(1, 1);
 
 		return chart;
 	}
