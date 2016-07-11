@@ -5,23 +5,26 @@
  */
 package com.stableapps.anglewraparounddemo;
 
-import com.stableapps.jfreechart.XYLineAndShapeRenderer;
-import java.awt.Color;
+import java.awt.Graphics2D;
+import java.awt.geom.Rectangle2D;
 
 import org.jfree.chart.ChartFactory;
 import org.jfree.chart.ChartPanel;
 import org.jfree.chart.JFreeChart;
 import org.jfree.chart.axis.NumberAxis;
 import org.jfree.chart.axis.ValueAxis;
+import org.jfree.chart.plot.PlotOrientation;
 import org.jfree.chart.plot.XYPlot;
-import org.jfree.chart.renderer.xy.XYAreaRenderer;
-import org.jfree.chart.renderer.xy.XYItemRenderer;
+import org.jfree.chart.renderer.xy.XYItemRendererState;
+import org.jfree.chart.renderer.xy.XYLineAndShapeRenderer;
+import org.jfree.chart.util.LineUtilities;
 import org.jfree.data.time.Minute;
 import org.jfree.data.time.RegularTimePeriod;
 import org.jfree.data.time.TimeSeries;
 import org.jfree.data.time.TimeSeriesCollection;
 import org.jfree.data.xy.XYDataset;
 import org.jfree.ui.ApplicationFrame;
+import org.jfree.ui.RectangleEdge;
 import org.jfree.ui.RefineryUtilities;
 
 /**
@@ -29,6 +32,11 @@ import org.jfree.ui.RefineryUtilities;
  * @author aris
  */
 public class AngleWrapDemoMain extends ApplicationFrame {
+
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = 1L;
 
 	/**
 	 * Creates a new demo instance.
@@ -41,6 +49,33 @@ public class AngleWrapDemoMain extends ApplicationFrame {
 		final ChartPanel chartPanel = new ChartPanel(chart);
 		chartPanel.setPreferredSize(new java.awt.Dimension(1024, 768));
 		setContentPane(chartPanel);
+	}
+	
+	/**
+	 * /**
+	 * An interface for creating custom logic for drawing lines between
+	 * points for XYLineAndShapeRenderer.
+	 */
+	public static interface DrawLinesCondition {
+
+		public static DrawLinesCondition ALWAYS_DRAW_LINES_CONDITION = new DrawLinesCondition() {
+			@Override
+			public boolean isDrawLine(double y0, double x0, double y1, double x1) {
+				return true;
+			}
+		};
+
+		/**
+		 * Custom logic for drawing lines between points.
+		 *
+		 * @param y0 previous y
+		 * @param x0 previous x
+		 * @param y1 current y
+		 * @param x1 current x
+		 * @return true, if you want to render a line between points.
+		 * Otherwise, return false
+		 */
+		public boolean isDrawLine(double y0, double x0, double y1, double x1);
 	}
 
 	/**
@@ -64,27 +99,6 @@ public class AngleWrapDemoMain extends ApplicationFrame {
 			} else if (direction > 360.0) {
 				direction = direction - 360.0;
 			}
-		}
-		dataset.addSeries(s1);
-		return dataset;
-	}
-
-	/**
-	 * Creates a sample dataset.
-	 *
-	 * @param count the item count.
-	 *
-	 * @return the dataset.
-	 */
-	private XYDataset createForceDataset(final int count) {
-		final TimeSeriesCollection dataset = new TimeSeriesCollection();
-		final TimeSeries s1 = new TimeSeries("Wind Force");
-		RegularTimePeriod start = new Minute();
-		double force = 3.0;
-		for (int i = 0; i < count; i++) {
-			s1.add(start, force);
-			start = start.next();
-			force = Math.max(0.5, force + (Math.random() - 0.5) * 0.5);
 		}
 		dataset.addSeries(s1);
 		return dataset;
@@ -118,12 +132,70 @@ public class AngleWrapDemoMain extends ApplicationFrame {
 
 		//There are two ways to provide custom logic for drawing lines between points:
 		//First is by assigning a DrawLinesCondition instance via XYLineAndShapeRenderer
-		XYLineAndShapeRenderer renderer = new XYLineAndShapeRenderer(new XYLineAndShapeRenderer.DrawLinesCondition() {
+		final DrawLinesCondition drawLinesCondition = new DrawLinesCondition() {
 			@Override
 			public boolean isDrawLine(double y0, double x0, double y1, double x1) {
 				return Math.abs(y1-y0) < 180;
 			}
-		}, false);
+		};
+		XYLineAndShapeRenderer renderer = new XYLineAndShapeRenderer(true, false)
+		{
+			/**
+			 * 
+			 */
+			private static final long serialVersionUID = 1L;
+
+			@Override
+			protected void drawPrimaryLine(XYItemRendererState state, Graphics2D g2, XYPlot plot, XYDataset dataset, int pass, int series, int item, ValueAxis domainAxis, ValueAxis rangeAxis, Rectangle2D dataArea) {
+				if (item == 0) {
+					return;
+				}
+
+				// get the data point...
+				double x1 = dataset.getXValue(series, item);
+				double y1 = dataset.getYValue(series, item);
+				if (Double.isNaN(y1) || Double.isNaN(x1)) {
+					return;
+				}
+
+				double x0 = dataset.getXValue(series, item - 1);
+				double y0 = dataset.getYValue(series, item - 1);
+				if (Double.isNaN(y0) || Double.isNaN(x0)) {
+					return;
+				}
+
+				if (!drawLinesCondition.isDrawLine(y0, x0, y1, x1)) {
+					return;
+				}
+
+				RectangleEdge xAxisLocation = plot.getDomainAxisEdge();
+				RectangleEdge yAxisLocation = plot.getRangeAxisEdge();
+
+				double transX0 = domainAxis.valueToJava2D(x0, dataArea, xAxisLocation);
+				double transY0 = rangeAxis.valueToJava2D(y0, dataArea, yAxisLocation);
+
+				double transX1 = domainAxis.valueToJava2D(x1, dataArea, xAxisLocation);
+				double transY1 = rangeAxis.valueToJava2D(y1, dataArea, yAxisLocation);
+
+				// only draw if we have good values
+				if (Double.isNaN(transX0) || Double.isNaN(transY0)
+					|| Double.isNaN(transX1) || Double.isNaN(transY1)) {
+					return;
+				}
+
+				PlotOrientation orientation = plot.getOrientation();
+				boolean visible;
+				if (orientation == PlotOrientation.HORIZONTAL) {
+					state.workingLine.setLine(transY0, transX0, transY1, transX1);
+				} else if (orientation == PlotOrientation.VERTICAL) {
+					state.workingLine.setLine(transX0, transY0, transX1, transY1);
+				}
+				visible = LineUtilities.clipLine(state.workingLine, dataArea);
+				if (visible) {
+					drawFirstPassShape(g2, pass, series, item, state.workingLine);
+				}
+			}
+		};
 		plot.setRenderer(0, renderer);
 
 		//Second is via getting an existing instance of XYLineAndShapeRenderer and calling its
@@ -135,16 +207,6 @@ public class AngleWrapDemoMain extends ApplicationFrame {
 //				return Math.abs(y1-y0) < 180;
 //			}
 //		});
-
-		// add the wind force with a secondary dataset/renderer/axis
-		final XYItemRenderer renderer2 = new XYAreaRenderer();
-		final ValueAxis axis2 = new NumberAxis("Force");
-		axis2.setRange(0.0, 12.0);
-		renderer2.setSeriesPaint(0, new Color(0, 0, 255, 128));
-		plot.setDataset(1, createForceDataset(600));
-		plot.setRenderer(1, renderer2);
-		plot.setRangeAxis(1, axis2);
-		plot.mapDatasetToRangeAxis(1, 1);
 
 		return chart;
 	}
