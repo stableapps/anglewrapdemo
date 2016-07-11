@@ -7,6 +7,8 @@ package com.stableapps.anglewraparounddemo;
 
 import java.awt.Graphics2D;
 import java.awt.geom.Rectangle2D;
+import org.apache.commons.math3.analysis.interpolation.LinearInterpolator;
+import org.apache.commons.math3.analysis.polynomials.PolynomialSplineFunction;
 
 import org.jfree.chart.ChartFactory;
 import org.jfree.chart.ChartPanel;
@@ -34,7 +36,7 @@ import org.jfree.ui.RefineryUtilities;
 public class AngleWrapDemoMain extends ApplicationFrame {
 
 	/**
-	 * 
+	 *
 	 */
 	private static final long serialVersionUID = 1L;
 
@@ -50,32 +52,25 @@ public class AngleWrapDemoMain extends ApplicationFrame {
 		chartPanel.setPreferredSize(new java.awt.Dimension(1024, 768));
 		setContentPane(chartPanel);
 	}
-	
+
 	/**
 	 * /**
 	 * An interface for creating custom logic for drawing lines between
 	 * points for XYLineAndShapeRenderer.
 	 */
-	public static interface DrawLinesCondition {
-
-		public static DrawLinesCondition ALWAYS_DRAW_LINES_CONDITION = new DrawLinesCondition() {
-			@Override
-			public boolean isDrawLine(double y0, double x0, double y1, double x1) {
-				return true;
-			}
-		};
+	public static interface OverflowCondition {
 
 		/**
-		 * Custom logic for drawing lines between points.
+		 * Custom logic for detecting overflow between points.
 		 *
 		 * @param y0 previous y
 		 * @param x0 previous x
 		 * @param y1 current y
 		 * @param x1 current x
-		 * @return true, if you want to render a line between points.
+		 * @return true, if you there is an overflow detected.
 		 * Otherwise, return false
 		 */
-		public boolean isDrawLine(double y0, double x0, double y1, double x1);
+		public boolean isOverflow(double y0, double x0, double y1, double x1);
 	}
 
 	/**
@@ -130,20 +125,20 @@ public class AngleWrapDemoMain extends ApplicationFrame {
 		rangeAxis.setAutoRangeIncludesZero(false);
 		plot.setRangeAxis(rangeAxis);
 
-		//There are two ways to provide custom logic for drawing lines between points:
-		//First is by assigning a DrawLinesCondition instance via XYLineAndShapeRenderer
-		final DrawLinesCondition drawLinesCondition = new DrawLinesCondition() {
+		final OverflowCondition overflowCondition = new OverflowCondition() {
 			@Override
-			public boolean isDrawLine(double y0, double x0, double y1, double x1) {
-				return Math.abs(y1-y0) < 180;
+			public boolean isOverflow(double y0, double x0, double y1, double x1) {
+				return Math.abs(y1 - y0) < 180;
 			}
 		};
-		XYLineAndShapeRenderer renderer = new XYLineAndShapeRenderer(true, false)
-		{
+		XYLineAndShapeRenderer renderer = new XYLineAndShapeRenderer(true, false) {
 			/**
-			 * 
+			 *
 			 */
 			private static final long serialVersionUID = 1L;
+			double min = 0;
+			double max = 360;
+			LinearInterpolator interpolator = new LinearInterpolator();
 
 			@Override
 			protected void drawPrimaryLine(XYItemRendererState state, Graphics2D g2, XYPlot plot, XYDataset dataset, int pass, int series, int item, ValueAxis domainAxis, ValueAxis rangeAxis, Rectangle2D dataArea) {
@@ -164,25 +159,37 @@ public class AngleWrapDemoMain extends ApplicationFrame {
 					return;
 				}
 
-				if (!drawLinesCondition.isDrawLine(y0, x0, y1, x1)) {
-					return;
+				if (!overflowCondition.isOverflow(y0, x0, y1, x1)) {
+					boolean overflowAtMax = y1 < y0;
+					if (overflowAtMax) {
+						PolynomialSplineFunction psf = interpolator.interpolate(new double[]{y0, y1 + max}, new double[]{x0, x1});
+						double xmid = psf.value(max);
+						drawPrimaryLine(state, g2, plot, x0, y0, xmid, max, pass, series, item, domainAxis, rangeAxis, dataArea);
+						drawPrimaryLine(state, g2, plot, xmid, min, x1, y1, pass, series, item, domainAxis, rangeAxis, dataArea);
+					} else {
+						PolynomialSplineFunction psf = interpolator.interpolate(new double[]{y1 - max, y0}, new double[]{x1, x0});
+						double xmid = psf.value(min);
+						drawPrimaryLine(state, g2, plot, x0, y0, xmid, min, pass, series, item, domainAxis, rangeAxis, dataArea);
+						drawPrimaryLine(state, g2, plot, xmid, max, x1, y1, pass, series, item, domainAxis, rangeAxis, dataArea);
+					}
+				} else {
+					drawPrimaryLine(state, g2, plot, x0, y0, x1, y1, pass, series, item, domainAxis, rangeAxis, dataArea);
 				}
 
+			}
+
+			private void drawPrimaryLine(XYItemRendererState state, Graphics2D g2, XYPlot plot, double x0, double y0, double x1, double y1, int pass, int series, int item, ValueAxis domainAxis, ValueAxis rangeAxis, Rectangle2D dataArea) {
 				RectangleEdge xAxisLocation = plot.getDomainAxisEdge();
 				RectangleEdge yAxisLocation = plot.getRangeAxisEdge();
-
 				double transX0 = domainAxis.valueToJava2D(x0, dataArea, xAxisLocation);
 				double transY0 = rangeAxis.valueToJava2D(y0, dataArea, yAxisLocation);
-
 				double transX1 = domainAxis.valueToJava2D(x1, dataArea, xAxisLocation);
 				double transY1 = rangeAxis.valueToJava2D(y1, dataArea, yAxisLocation);
-
 				// only draw if we have good values
 				if (Double.isNaN(transX0) || Double.isNaN(transY0)
 					|| Double.isNaN(transX1) || Double.isNaN(transY1)) {
 					return;
 				}
-
 				PlotOrientation orientation = plot.getOrientation();
 				boolean visible;
 				if (orientation == PlotOrientation.HORIZONTAL) {
@@ -197,16 +204,6 @@ public class AngleWrapDemoMain extends ApplicationFrame {
 			}
 		};
 		plot.setRenderer(0, renderer);
-
-		//Second is via getting an existing instance of XYLineAndShapeRenderer and calling its
-		//method setDrawLinesCondition(DrawLinesCondition)
-//		XYLineAndShapeRenderer renderer = (XYLineAndShapeRenderer) plot.getRenderer(0);
-//		renderer.setDrawLinesCondition(new XYLineAndShapeRenderer.DrawLinesCondition() {
-//			@Override
-//			public boolean isDrawLine(double y0, double x0, double y1, double x1) {
-//				return Math.abs(y1-y0) < 180;
-//			}
-//		});
 
 		return chart;
 	}
