@@ -7,6 +7,7 @@ package com.stableapps.anglewraparounddemo;
 
 import java.awt.Graphics2D;
 import java.awt.geom.Rectangle2D;
+import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.math3.analysis.interpolation.LinearInterpolator;
 import org.apache.commons.math3.analysis.polynomials.PolynomialSplineFunction;
 
@@ -128,7 +129,7 @@ public class AngleWrapDemoMain extends ApplicationFrame {
 		final OverflowCondition overflowCondition = new OverflowCondition() {
 			@Override
 			public boolean isOverflow(double y0, double x0, double y1, double x1) {
-				return Math.abs(y1 - y0) < 180;
+				return Math.abs(y1 - y0) > 180;
 			}
 		};
 		XYLineAndShapeRenderer renderer = new XYLineAndShapeRenderer(true, false) {
@@ -159,7 +160,7 @@ public class AngleWrapDemoMain extends ApplicationFrame {
 					return;
 				}
 
-				if (!overflowCondition.isOverflow(y0, x0, y1, x1)) {
+				if (overflowCondition.isOverflow(y0, x0, y1, x1)) {
 					boolean overflowAtMax = y1 < y0;
 					if (overflowAtMax) {
 						PolynomialSplineFunction psf = interpolator.interpolate(new double[]{y0, y1 + max}, new double[]{x0, x1});
@@ -202,7 +203,86 @@ public class AngleWrapDemoMain extends ApplicationFrame {
 					drawFirstPassShape(g2, pass, series, item, state.workingLine);
 				}
 			}
+
+			@Override
+			protected void drawPrimaryLineAsPath(XYItemRendererState state,
+				Graphics2D g2, XYPlot plot, XYDataset dataset, int pass,
+				int series, int item, ValueAxis domainAxis, ValueAxis rangeAxis,
+				Rectangle2D dataArea) {
+
+				// get the data point...
+				State s = (State) state;
+				try {
+					double x1 = dataset.getXValue(series, item);
+					double y1 = dataset.getYValue(series, item);
+					if (Double.isNaN(x1) && Double.isNaN(y1)) {
+						s.setLastPointGood(false);
+						return;
+					}
+
+					if (!s.isLastPointGood()) {
+						ImmutablePair<Float, Float> xy = translate(plot, domainAxis, rangeAxis, dataArea, x1, y1);
+						s.seriesPath.moveTo(xy.getLeft(), xy.getRight());
+						s.setLastPointGood(true);
+						return;
+					}
+
+					double x0 = dataset.getXValue(series, item - 1);
+					double y0 = dataset.getYValue(series, item - 1);
+					if (overflowCondition.isOverflow(y0, x0, y1, x1)) {
+						boolean overflowAtMax = y1 < y0;
+						if (overflowAtMax) {
+							PolynomialSplineFunction psf = interpolator.interpolate(new double[]{y0, y1 + max}, new double[]{x0, x1});
+							double xmid = psf.value(max);
+							ImmutablePair<Float, Float> xy = translate(plot, domainAxis, rangeAxis, dataArea, xmid, max);
+							s.seriesPath.lineTo(xy.getLeft(), xy.getRight());
+							xy = translate(plot, domainAxis, rangeAxis, dataArea, xmid, min);
+							s.seriesPath.moveTo(xy.getLeft(), xy.getRight());
+							xy = translate(plot, domainAxis, rangeAxis, dataArea, x1, y1);
+							s.seriesPath.lineTo(xy.getLeft(), xy.getRight());
+						} else {
+							PolynomialSplineFunction psf = interpolator.interpolate(new double[]{y1 - max, y0}, new double[]{x1, x0});
+							double xmid = psf.value(min);
+							ImmutablePair<Float, Float> xy = translate(plot, domainAxis, rangeAxis, dataArea, xmid, min);
+							s.seriesPath.lineTo(xy.getLeft(), xy.getRight());
+							xy = translate(plot, domainAxis, rangeAxis, dataArea, xmid, max);
+							s.seriesPath.moveTo(xy.getLeft(), xy.getRight());
+							xy = translate(plot, domainAxis, rangeAxis, dataArea, x1, y1);
+							s.seriesPath.lineTo(xy.getLeft(), xy.getRight());
+						}
+					} else {
+						ImmutablePair<Float, Float> xy = translate(plot, domainAxis, rangeAxis, dataArea, x1, y1);
+						s.seriesPath.lineTo(xy.getLeft(), xy.getRight());
+					}
+
+					s.setLastPointGood(true);
+				} finally {
+					// if this is the last item, draw the path ...
+					if (item == s.getLastItemIndex()) {
+						// draw path
+						drawFirstPassShape(g2, pass, series, item, s.seriesPath);
+					}
+
+				}
+			}
+
+			private ImmutablePair<Float, Float> translate(XYPlot plot, ValueAxis domainAxis, ValueAxis rangeAxis, Rectangle2D dataArea, double x, double y) {
+				RectangleEdge xAxisLocation = plot.getDomainAxisEdge();
+				RectangleEdge yAxisLocation = plot.getRangeAxisEdge();
+				double transX1 = domainAxis.valueToJava2D(x, dataArea, xAxisLocation);
+				double transY1 = rangeAxis.valueToJava2D(y, dataArea, yAxisLocation);
+				// update path to reflect latest point
+				float xtrans = (float) transX1;
+				float ytrans = (float) transY1;
+				PlotOrientation orientation = plot.getOrientation();
+				if (orientation == PlotOrientation.HORIZONTAL) {
+					xtrans = (float) transY1;
+					ytrans = (float) transX1;
+				}
+				return new ImmutablePair<>(xtrans, ytrans);
+			}
 		};
+		renderer.setDrawSeriesLineAsPath(true);
 		plot.setRenderer(0, renderer);
 
 		return chart;
