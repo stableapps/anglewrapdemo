@@ -15,6 +15,7 @@ import org.jfree.chart.ChartFactory;
 import org.jfree.chart.ChartPanel;
 import org.jfree.chart.JFreeChart;
 import org.jfree.chart.axis.NumberAxis;
+import org.jfree.chart.axis.NumberTickUnit;
 import org.jfree.chart.axis.ValueAxis;
 import org.jfree.chart.plot.PlotOrientation;
 import org.jfree.chart.plot.XYPlot;
@@ -121,8 +122,23 @@ public class AngleWrapDemoMain extends ApplicationFrame {
 		plot.getDomainAxis().setLowerMargin(0.0);
 		plot.getDomainAxis().setUpperMargin(0.0);
 
-		// configure the range axis to display directions...
-		final NumberAxis rangeAxis = (NumberAxis) plot.getRangeAxis();
+		// configure the range axis to provide a fix set of TickUnits depending on size of chart
+		NumberAxis rangeAxis = new NumberAxis() {
+			@Override
+			public NumberTickUnit getTickUnit() {
+				NumberTickUnit tickUnit = super.getTickUnit();
+				if (tickUnit.getSize() < 45) {
+					return new NumberTickUnit(45);
+				} else if (tickUnit.getSize() < 90) {
+					return new NumberTickUnit(90);
+				} else if (tickUnit.getSize() < 180) {
+					return new NumberTickUnit(180);
+				} else {
+					return new NumberTickUnit(360);
+				}
+			}
+
+		};
 		rangeAxis.setAutoRangeIncludesZero(false);
 		plot.setRangeAxis(rangeAxis);
 
@@ -163,12 +179,12 @@ public class AngleWrapDemoMain extends ApplicationFrame {
 				if (overflowCondition.isOverflow(y0, x0, y1, x1)) {
 					boolean overflowAtMax = y1 < y0;
 					if (overflowAtMax) {
-						PolynomialSplineFunction psf = interpolator.interpolate(new double[]{y0, y1 + (max-min)}, new double[]{x0, x1});
+						PolynomialSplineFunction psf = interpolator.interpolate(new double[]{y0, y1 + (max - min)}, new double[]{x0, x1});
 						double xmid = psf.value(max);
 						drawPrimaryLine(state, g2, plot, x0, y0, xmid, max, pass, series, item, domainAxis, rangeAxis, dataArea);
 						drawPrimaryLine(state, g2, plot, xmid, min, x1, y1, pass, series, item, domainAxis, rangeAxis, dataArea);
 					} else {
-						PolynomialSplineFunction psf = interpolator.interpolate(new double[]{y1 - (max-min), y0}, new double[]{x1, x0});
+						PolynomialSplineFunction psf = interpolator.interpolate(new double[]{y1 - (max - min), y0}, new double[]{x1, x0});
 						double xmid = psf.value(min);
 						drawPrimaryLine(state, g2, plot, x0, y0, xmid, min, pass, series, item, domainAxis, rangeAxis, dataArea);
 						drawPrimaryLine(state, g2, plot, xmid, max, x1, y1, pass, series, item, domainAxis, rangeAxis, dataArea);
@@ -232,7 +248,7 @@ public class AngleWrapDemoMain extends ApplicationFrame {
 					if (overflowCondition.isOverflow(y0, x0, y1, x1)) {
 						boolean overflowAtMax = y1 < y0;
 						if (overflowAtMax) {
-							PolynomialSplineFunction psf = interpolator.interpolate(new double[]{y0, y1 + (max-min)}, new double[]{x0, x1});
+							PolynomialSplineFunction psf = interpolator.interpolate(new double[]{y0, y1 + (max - min)}, new double[]{x0, x1});
 							double xmid = psf.value(max);
 							ImmutablePair<Float, Float> xy = translate(plot, domainAxis, rangeAxis, dataArea, xmid, max);
 							s.seriesPath.lineTo(xy.getLeft(), xy.getRight());
@@ -241,7 +257,7 @@ public class AngleWrapDemoMain extends ApplicationFrame {
 							xy = translate(plot, domainAxis, rangeAxis, dataArea, x1, y1);
 							s.seriesPath.lineTo(xy.getLeft(), xy.getRight());
 						} else {
-							PolynomialSplineFunction psf = interpolator.interpolate(new double[]{y1 - (max-min), y0}, new double[]{x1, x0});
+							PolynomialSplineFunction psf = interpolator.interpolate(new double[]{y1 - (max - min), y0}, new double[]{x1, x0});
 							double xmid = psf.value(min);
 							ImmutablePair<Float, Float> xy = translate(plot, domainAxis, rangeAxis, dataArea, xmid, min);
 							s.seriesPath.lineTo(xy.getLeft(), xy.getRight());
