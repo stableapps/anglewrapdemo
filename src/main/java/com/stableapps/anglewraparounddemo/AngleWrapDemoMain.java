@@ -121,10 +121,17 @@ public class AngleWrapDemoMain extends ApplicationFrame {
 
 		// configure the range axis to provide a fix set of TickUnits depending on size of chart
 		NumberAxis rangeAxis = new NumberAxis() {
+			/**
+			 * 
+			 */
+			private static final long serialVersionUID = 1L;
+
 			@Override
 			public NumberTickUnit getTickUnit() {
 				NumberTickUnit tickUnit = super.getTickUnit();
-				if (tickUnit.getSize() < 45) {
+				if (tickUnit.getSize() < 15) {
+					return tickUnit;
+				} else if (tickUnit.getSize() < 45) {
 					return new NumberTickUnit(45);
 				} else if (tickUnit.getSize() < 90) {
 					return new NumberTickUnit(90);
